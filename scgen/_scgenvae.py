@@ -3,7 +3,6 @@ from typing import Literal
 import numpy as np
 import torch
 from scvi import REGISTRY_KEYS
-from scvi.module._constants import _MODULEKEYS
 from scvi.module.base import BaseModuleClass, LossOutput, auto_move_data
 from scvi.nn import Encoder
 from torch.distributions import Normal
@@ -81,15 +80,15 @@ class SCGENVAE(BaseModuleClass):
 
     def _get_inference_input(self, tensors):
         x = tensors[REGISTRY_KEYS.X_KEY]
-        input_dict = {
-            REGISTRY_KEYS.X_KEY:x,
-        }
+        input_dict = dict(
+            x=x,
+        )
         return input_dict
 
     def _get_generative_input(self, tensors, inference_outputs):
-        z = inference_outputs[_MODULEKEYS.Z_KEY]
+        z = inference_outputs["z"]
         input_dict = {
-            _MODULEKEYS.Z_KEY: z,
+            "z": z,
         }
         return input_dict
 
@@ -102,7 +101,7 @@ class SCGENVAE(BaseModuleClass):
         """
         qz_m, qz_v, z = self.z_encoder(x)
 
-        outputs = {_MODULEKEYS.Z_KEY:z, _MODULEKEYS.QZM_KEY:qz_m, _MODULEKEYS.QZV_KEY:qz_v}
+        outputs = dict(z=z, qzm=qz_m, qzv=qz_v)
         return outputs
 
     @auto_move_data
@@ -110,7 +109,7 @@ class SCGENVAE(BaseModuleClass):
         """Runs the generative model."""
         px = self.decoder(z)
 
-        return {_MODULEKEYS.PX_KEY:px}
+        return dict(px=px)
 
     def loss(
         self,
@@ -119,9 +118,9 @@ class SCGENVAE(BaseModuleClass):
         generative_outputs,
     ):
         x = tensors[REGISTRY_KEYS.X_KEY]
-        qz_m = inference_outputs[_MODULEKEYS.QZ_M_KEY]
-        qz_v = inference_outputs[_MODULEKEYS.QZ_V_KEY]
-        p = generative_outputs[_MODULEKEYS.PX_KEY]
+        qz_m = inference_outputs["qzm"]
+        qz_v = inference_outputs["qzv"]
+        p = generative_outputs["px"]
 
         kld = kl(
             Normal(qz_m, torch.sqrt(qz_v)),
@@ -165,7 +164,7 @@ class SCGENVAE(BaseModuleClass):
             inference_kwargs=inference_kwargs,
             compute_loss=False,
         )
-        px = Normal(generative_outputs[_MODULEKEYS.PX_KEY], 1).sample()
+        px = Normal(generative_outputs["px"], 1).sample()
         return px.cpu().numpy()
 
     def get_reconstruction_loss(self, x, px) -> torch.Tensor:
